@@ -4,7 +4,6 @@ import uuid
 import csv
 import io
 import math
-import secrets
 from datetime import datetime
 from functools import wraps
 from flask import Flask, request, jsonify, send_from_directory, Response
@@ -107,7 +106,7 @@ def init_db():
         )
     """)
 
-    # Seed default Admin, Artisans, Customer, and sample Handicrafts if empty
+    # Seed only the platform admin in a new database; public users register themselves.
     cur.execute("SELECT COUNT(*) FROM users")
     if cur.fetchone()[0] == 0:
         admin_password = os.environ.get("KALAKRITI_ADMIN_PASSWORD")
@@ -116,59 +115,12 @@ def init_db():
             raise RuntimeError("Set KALAKRITI_ADMIN_PASSWORD before initializing a new database.")
 
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        users_seed = [
-            ("Platform Admin", "admin@kalakriti.in", generate_password_hash(admin_password), "admin",
-             "System Administrator for Local Artisan & Handcraft Marketplace", "Bengaluru, Karnataka", "Administration", "9876543210", 1, now),
-            ("Ramesh Achari", "ramesh@artisan.in", generate_password_hash(secrets.token_urlsafe(32)), "artisan",
-             "Third-generation woodcarver specializing in traditional sandalwood and rosewood figurines.", "Sagara, Karnataka", "Wood Carving", "9845011223", 1, now),
-            ("Lakshmi Naik", "lakshmi@artisan.in", generate_password_hash(secrets.token_urlsafe(32)), "artisan",
-             "Handloom weaver and natural-dye terracotta pottery artist from coastal Karnataka.", "Udupi, Karnataka", "Terracotta & Handloom", "9845044556", 1, now),
-            ("Ananya Shetty", "customer@public.in", generate_password_hash(secrets.token_urlsafe(32)), "customer",
-             "Art enthusiast supporting authentic handmade Indian crafts.", "Mangaluru, Karnataka", "", "9900112233", 1, now),
-        ]
-        cur.executemany("""
+        cur.execute("""
             INSERT INTO users (name, email, password_hash, role, bio, location, craft_specialty, phone, is_active, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, users_seed)
-
-        products_seed = [
-            (2, "Hand-Carved Rosewood Elephant", "Woodwork",
-             "Intricately chiseled rosewood elephant with traditional floral motifs crafted using hand tools.",
-             1850.0, 8, 1, "https://images.unsplash.com/photo-1582555172866-f73bb12a2ab3?auto=format&fit=crop&w=600&q=80", now),
-            (2, "Sandalwood Yakshagana Mask", "Woodwork",
-             "Authentic hand-painted wooden Yakshagana headgear wall decor inspired by Tulunadu folk theatre.",
-             2400.0, 5, 1, "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=600&q=80", now),
-            (3, "Terracotta Warli Painted Vase", "Pottery",
-             "Wheel-thrown earthen clay vase hand-painted with traditional tribal Warli storytelling art.",
-             750.0, 15, 1, "https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&w=600&q=80", now),
-            (3, "Handloom Kasuti Embroidered Stole", "Textiles",
-             "Pure organic cotton stole featuring traditional geometric Kasuti hand embroidery.",
-             1350.0, 10, 1, "https://images.unsplash.com/photo-1606760227091-3dd870d97f1d?auto=format&fit=crop&w=600&q=80", now),
-            (3, "Brass & Bell Metal Puja Lamp", "Metalwork",
-             "Traditional lost-wax cast brass diya lamp crafted for festive home decor.",
-             1100.0, 12, 1, "https://images.unsplash.com/photo-1605649487212-47bdab064df7?auto=format&fit=crop&w=600&q=80", now),
-            (2, "Bamboo Woven Picnic & Storage Basket", "Bamboo & Cane",
-             "Eco-friendly handwoven river-cane basket treated with natural beeswax finish.",
-             620.0, 20, 1, "https://images.unsplash.com/photo-1595408076683-5d116b25b58d?auto=format&fit=crop&w=600&q=80", now),
-        ]
-        cur.executemany("""
-            INSERT INTO products (artisan_id, title, category, description, price, stock, is_available, image_url, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, products_seed)
-
-        # Seed one initial order
-        cur.execute("""
-            INSERT INTO orders (customer_id, total_amount, shipping_address, payment_method, status, created_at)
-            VALUES (4, 2600.0, 'Flat 302, Green Valley Apts, Bejai, Mangaluru - 575004', 'UPI', 'Confirmed', ?)
-        """, (now,))
-        order_id = cur.lastrowid
-        cur.executemany("""
-            INSERT INTO order_items (order_id, product_id, artisan_id, quantity, unit_price)
-            VALUES (?, ?, ?, ?, ?)
-        """, [
-            (order_id, 1, 2, 1, 1850.0),
-            (order_id, 3, 3, 1, 750.0),
-        ])
+        """, ("Platform Admin", "admin@kalakriti.in", generate_password_hash(admin_password),
+              "admin", "System Administrator for Local Artisan & Handcraft Marketplace",
+              "Bengaluru, Karnataka", "Administration", "9876543210", 1, now))
 
     conn.commit()
     conn.close()
