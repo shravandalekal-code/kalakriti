@@ -1,4 +1,4 @@
-const API_BASE = "http://127.0.0.1:5000/api";
+const API_BASE = window.KALAKRITI_API_BASE;
 
 let currentUser = JSON.parse(localStorage.getItem("kalakriti_user") || "null");
 let authToken = localStorage.getItem("kalakriti_token") || "";

@@ -1,4 +1,4 @@
-const API_BASE = "http://127.0.0.1:5000/api";
+const API_BASE = window.KALAKRITI_API_BASE;
 let adminToken = localStorage.getItem("kalakriti_admin_token") || "";
 let adminArtisans = [];
 

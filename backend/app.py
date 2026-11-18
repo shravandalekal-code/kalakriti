@@ -13,11 +13,14 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-CORS(app)
+cors_origins = [origin.strip() for origin in os.environ.get("CORS_ORIGINS", "*").split(",") if origin.strip()]
+CORS(app, origins=cors_origins)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "artisan_marketplace.db")
-UPLOAD_FOLDER = os.path.join(BASE_DIR, "static", "uploads")
+DB_PATH = os.environ.get("DATABASE_PATH", os.path.join(BASE_DIR, "artisan_marketplace.db"))
+UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", os.path.join(BASE_DIR, "static", "uploads"))
+BACKEND_PUBLIC_URL = os.environ.get("BACKEND_PUBLIC_URL", "http://127.0.0.1:5000").rstrip("/")
+os.makedirs(os.path.dirname(DB_PATH) or BASE_DIR, exist_ok=True)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "gif"}
@@ -26,6 +29,10 @@ ACTIVE_TOKENS = {}  # token -> {"user_id": int, "role": str}
 
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def uploaded_image_url(filename):
+    return f"{BACKEND_PUBLIC_URL}/uploads/{filename}"
 
 
 def get_db():
@@ -406,7 +413,7 @@ def artisan_products():
                 ext = file.filename.rsplit(".", 1)[1].lower()
                 fname = f"{uuid.uuid4().hex}.{ext}"
                 file.save(os.path.join(UPLOAD_FOLDER, fname))
-                image_url = f"http://127.0.0.1:5000/uploads/{fname}"
+                image_url = uploaded_image_url(fname)
     else:
         data = request.get_json() or {}
         title = (data.get("title") or "").strip()
@@ -495,7 +502,7 @@ def manage_single_product(product_id):
         ext = image.filename.rsplit(".", 1)[1].lower()
         filename = f"{uuid.uuid4().hex}.{ext}"
         image.save(os.path.join(UPLOAD_FOLDER, filename))
-        image_url = f"http://127.0.0.1:5000/uploads/{filename}"
+        image_url = uploaded_image_url(filename)
 
     cur.execute("""
         UPDATE products
@@ -657,7 +664,7 @@ def admin_products():
         ext = image.filename.rsplit(".", 1)[1].lower()
         filename = f"{uuid.uuid4().hex}.{ext}"
         image.save(os.path.join(UPLOAD_FOLDER, filename))
-        image_url = f"http://127.0.0.1:5000/uploads/{filename}"
+        image_url = uploaded_image_url(filename)
 
     if not image_url:
         image_url = "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=600&q=80"
