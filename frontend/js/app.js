@@ -44,12 +44,14 @@ function showSection(sectionName) {
 // -------------------- AUTHENTICATION (CUSTOMER & ARTISAN) --------------------
 function updateAuthUI() {
   const navAuth = document.getElementById("nav-auth");
+  const navArtisanAuth = document.getElementById("nav-artisan-auth");
   const userPill = document.getElementById("user-pill");
   const navArtisan = document.getElementById("nav-artisan");
   const navOrders = document.getElementById("nav-orders");
 
   if (currentUser && authToken) {
     navAuth.classList.add("hidden");
+    navArtisanAuth.classList.add("hidden");
     userPill.classList.remove("hidden");
     document.getElementById("user-greeting").textContent = `${currentUser.name} (${currentUser.role})`;
 
@@ -62,6 +64,7 @@ function updateAuthUI() {
     }
   } else {
     navAuth.classList.remove("hidden");
+    navArtisanAuth.classList.remove("hidden");
     userPill.classList.add("hidden");
     navArtisan.classList.add("hidden");
     navOrders.classList.add("hidden");
@@ -84,15 +87,31 @@ function switchAuthTab(tab) {
   document.getElementById("public-register-form").classList.toggle("hidden", tab !== "register");
 }
 
-async function handlePublicLogin(e) {
+function openArtisanAuthModal() {
+  switchArtisanAuthTab("register");
+  document.getElementById("artisan-auth-modal").classList.remove("hidden");
+}
+
+function closeArtisanAuthModal() {
+  document.getElementById("artisan-auth-modal").classList.add("hidden");
+}
+
+function switchArtisanAuthTab(tab) {
+  document.getElementById("artisan-tab-login").classList.toggle("active", tab === "login");
+  document.getElementById("artisan-tab-register").classList.toggle("active", tab === "register");
+  document.getElementById("artisan-login-form").classList.toggle("hidden", tab !== "login");
+  document.getElementById("artisan-register-form").classList.toggle("hidden", tab !== "register");
+}
+
+async function signInUser(e, emailInputId, passwordInputId, portal, modalId) {
   e.preventDefault();
-  const email = document.getElementById("login-email").value;
-  const password = document.getElementById("login-password").value;
+  const email = document.getElementById(emailInputId).value;
+  const password = document.getElementById(passwordInputId).value;
 
   const res = await fetch(`${API_BASE}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password, portal: "public" })
+    body: JSON.stringify({ email, password, portal })
   });
   const data = await res.json();
   if (!res.ok) {
@@ -105,7 +124,7 @@ async function handlePublicLogin(e) {
   localStorage.setItem("kalakriti_user", JSON.stringify(currentUser));
   localStorage.setItem("kalakriti_token", authToken);
 
-  closeAuthModal();
+  document.getElementById(modalId).classList.add("hidden");
   updateAuthUI();
   showToast(`Welcome back, ${currentUser.name}!`);
 
@@ -114,16 +133,16 @@ async function handlePublicLogin(e) {
   }
 }
 
-async function handlePublicRegister(e) {
-  e.preventDefault();
-  const payload = {
-    role: "customer",
-    name: document.getElementById("reg-name").value,
-    email: document.getElementById("reg-email").value,
-    password: document.getElementById("reg-password").value,
-    location: document.getElementById("reg-location").value
-  };
+function handlePublicLogin(e) {
+  return signInUser(e, "login-email", "login-password", "public", "auth-modal");
+}
 
+function handleArtisanLogin(e) {
+  return signInUser(e, "artisan-login-email", "artisan-login-password", "artisan", "artisan-auth-modal");
+}
+
+async function registerUser(e, payload, modalId) {
+  e.preventDefault();
   const res = await fetch(`${API_BASE}/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -140,9 +159,38 @@ async function handlePublicRegister(e) {
   localStorage.setItem("kalakriti_user", JSON.stringify(currentUser));
   localStorage.setItem("kalakriti_token", authToken);
 
-  closeAuthModal();
+  document.getElementById(modalId).classList.add("hidden");
   updateAuthUI();
   showToast("Account created successfully!");
+
+  if (currentUser.role === "artisan") {
+    showSection("artisan-dashboard");
+  }
+}
+
+function handlePublicRegister(e) {
+  const payload = {
+    role: "customer",
+    name: document.getElementById("reg-name").value,
+    email: document.getElementById("reg-email").value,
+    password: document.getElementById("reg-password").value,
+    location: document.getElementById("reg-location").value
+  };
+  return registerUser(e, payload, "auth-modal");
+}
+
+function handleArtisanRegister(e) {
+  const payload = {
+    role: "artisan",
+    name: document.getElementById("artisan-reg-name").value,
+    email: document.getElementById("artisan-reg-email").value,
+    password: document.getElementById("artisan-reg-password").value,
+    craft_specialty: document.getElementById("artisan-reg-specialty").value,
+    location: document.getElementById("artisan-reg-location").value,
+    phone: document.getElementById("artisan-reg-phone").value,
+    bio: document.getElementById("artisan-reg-bio").value
+  };
+  return registerUser(e, payload, "artisan-auth-modal");
 }
 
 async function logoutUser() {

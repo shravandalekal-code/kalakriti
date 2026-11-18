@@ -263,8 +263,11 @@ def login():
     if expected_portal == "admin" and user["role"] != "admin":
         return jsonify({"error": "Access Denied. Only Administrators can sign in via the Admin Portal."}), 403
 
-    if expected_portal == "public" and user["role"] == "admin":
-        return jsonify({"error": "Administrators must sign in through the dedicated Admin Login Portal."}), 403
+    if expected_portal == "artisan" and user["role"] != "artisan":
+        return jsonify({"error": "Access Denied. Only Artisans can sign in via the Artisan Portal."}), 403
+
+    if expected_portal == "public" and user["role"] != "customer":
+        return jsonify({"error": "Access Denied. Only Customers can sign in through the Public Login Portal."}), 403
 
     token = str(uuid.uuid4())
     ACTIVE_TOKENS[token] = {"user_id": user["id"], "role": user["role"]}

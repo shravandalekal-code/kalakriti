@@ -25,6 +25,7 @@
         Cart (<span id="cart-count">0</span>)
       </button>
       <button class="nav-btn primary-outline" id="nav-auth" onclick="openAuthModal()">Public Login / Register</button>
+      <button class="nav-btn primary-outline" id="nav-artisan-auth" onclick="openArtisanAuthModal()">Artisan Login / Register</button>
       <div class="user-pill hidden" id="user-pill">
         <span id="user-greeting"></span>
         <button class="btn-sm btn-danger" onclick="logoutUser()">Logout</button>
@@ -206,7 +207,7 @@
 
       <!-- Login Form -->
       <form id="public-login-form" class="hidden" onsubmit="handlePublicLogin(event)">
-        <h3>Sign In (Customer or Artisan)</h3>
+        <h3>Sign In to Customer Account</h3>
         <label>Email Address</label>
         <input type="email" id="login-email" required placeholder="Enter your email address" />
         <label>Password</label>
@@ -226,6 +227,45 @@
         <label>City / Village Location (optional)</label>
         <input type="text" id="reg-location" placeholder="e.g., Puttur, Karnataka" />
         <button type="submit" class="btn-primary full-width">Register & Continue</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ARTISAN LOGIN / REGISTRATION MODAL -->
+  <div class="modal hidden" id="artisan-auth-modal">
+    <div class="modal-content">
+      <button class="close-btn" onclick="closeArtisanAuthModal()">×</button>
+      <div class="auth-tabs">
+        <button class="tab-btn active" id="artisan-tab-register" onclick="switchArtisanAuthTab('register')">Artisan Registration</button>
+        <button class="tab-btn" id="artisan-tab-login" onclick="switchArtisanAuthTab('login')">Artisan Login</button>
+      </div>
+
+      <form id="artisan-login-form" class="hidden" onsubmit="handleArtisanLogin(event)">
+        <h3>Sign In to Artisan Studio</h3>
+        <label>Email Address</label>
+        <input type="email" id="artisan-login-email" required />
+        <label>Password</label>
+        <input type="password" id="artisan-login-password" required />
+        <button type="submit" class="btn-primary full-width">Login to Artisan Studio</button>
+      </form>
+
+      <form id="artisan-register-form" onsubmit="handleArtisanRegister(event)">
+        <h3>Create an Artisan Account</h3>
+        <label>Full Name / Workshop Name</label>
+        <input type="text" id="artisan-reg-name" required />
+        <label>Email Address</label>
+        <input type="email" id="artisan-reg-email" required />
+        <label>Password</label>
+        <input type="password" id="artisan-reg-password" minlength="4" required />
+        <label>Craft Specialty</label>
+        <input type="text" id="artisan-reg-specialty" required placeholder="e.g., Wood Carving, Pottery" />
+        <label>City / Village Location</label>
+        <input type="text" id="artisan-reg-location" />
+        <label>Contact Phone (optional)</label>
+        <input type="tel" id="artisan-reg-phone" />
+        <label>Short Artisan Story (optional)</label>
+        <textarea id="artisan-reg-bio" rows="2"></textarea>
+        <button type="submit" class="btn-primary full-width">Register & Open Artisan Studio</button>
       </form>
     </div>
   </div>
