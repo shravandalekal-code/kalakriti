@@ -195,12 +195,12 @@
     </div>
   </div>
 
-  <!-- PUBLIC LOGIN / REGISTER MODAL (Customer & Artisan) -->
+  <!-- PUBLIC LOGIN / CUSTOMER REGISTRATION MODAL -->
   <div class="modal hidden" id="auth-modal">
     <div class="modal-content">
       <button class="close-btn" onclick="closeAuthModal()">×</button>
       <div class="auth-tabs">
-        <button class="tab-btn active" id="tab-register" onclick="switchAuthTab('register')">New Registration</button>
+        <button class="tab-btn active" id="tab-register" onclick="switchAuthTab('register')">Register to Buy</button>
         <button class="tab-btn" id="tab-login" onclick="switchAuthTab('login')">Public Login</button>
       </div>
 
@@ -216,26 +216,15 @@
 
       <!-- Register Form -->
       <form id="public-register-form" onsubmit="handlePublicRegister(event)">
-        <h3>Create Public Account</h3>
-        <label>Account Type (User Type)</label>
-        <select id="reg-role" onchange="toggleArtisanFields()">
-          <option value="customer">Customer (Browse & Buy Handcrafts)</option>
-          <option value="artisan">Artisan (Sell & Manage Handcrafts)</option>
-        </select>
+        <h3>Create Customer Account</h3>
         <label>Full Name</label>
         <input type="text" id="reg-name" required />
         <label>Email Address</label>
         <input type="email" id="reg-email" required />
         <label>Password</label>
         <input type="password" id="reg-password" minlength="4" required />
-        <label>City / Village Location</label>
+        <label>City / Village Location (optional)</label>
         <input type="text" id="reg-location" placeholder="e.g., Puttur, Karnataka" />
-        <div id="reg-artisan-extra" class="hidden">
-          <label>Craft Specialty</label>
-          <input type="text" id="reg-specialty" placeholder="e.g., Wood Carving, Pottery" />
-          <label>Short Bio</label>
-          <textarea id="reg-bio" rows="2"></textarea>
-        </div>
         <button type="submit" class="btn-primary full-width">Register & Continue</button>
       </form>
     </div>

@@ -84,11 +84,6 @@ function switchAuthTab(tab) {
   document.getElementById("public-register-form").classList.toggle("hidden", tab !== "register");
 }
 
-function toggleArtisanFields() {
-  const role = document.getElementById("reg-role").value;
-  document.getElementById("reg-artisan-extra").classList.toggle("hidden", role !== "artisan");
-}
-
 async function handlePublicLogin(e) {
   e.preventDefault();
   const email = document.getElementById("login-email").value;
@@ -122,13 +117,11 @@ async function handlePublicLogin(e) {
 async function handlePublicRegister(e) {
   e.preventDefault();
   const payload = {
-    role: document.getElementById("reg-role").value,
+    role: "customer",
     name: document.getElementById("reg-name").value,
     email: document.getElementById("reg-email").value,
     password: document.getElementById("reg-password").value,
-    location: document.getElementById("reg-location").value,
-    craft_specialty: document.getElementById("reg-specialty").value,
-    bio: document.getElementById("reg-bio").value
+    location: document.getElementById("reg-location").value
   };
 
   const res = await fetch(`${API_BASE}/auth/register`, {
@@ -150,10 +143,6 @@ async function handlePublicRegister(e) {
   closeAuthModal();
   updateAuthUI();
   showToast("Account created successfully!");
-
-  if (currentUser.role === "artisan") {
-    showSection("artisan-dashboard");
-  }
 }
 
 async function logoutUser() {
