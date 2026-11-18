@@ -41,7 +41,7 @@ function showSection(sectionName) {
   }
 }
 
-// -------------------- AUTHENTICATION (CUSTOMER & ARTISAN) --------------------
+// -------------------- CUSTOMER & ARTISAN AUTHENTICATION --------------------
 function updateAuthUI() {
   const navAuth = document.getElementById("nav-auth");
   const navArtisanAuth = document.getElementById("nav-artisan-auth");
