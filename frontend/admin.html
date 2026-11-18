@@ -38,12 +38,6 @@
 
   <!-- STEP 2: ADMIN DASHBOARD (Manage Users -> Manage Products -> View & Update Orders -> Generate Reports) -->
   <main class="container hidden" id="admin-dashboard-section">
-    <div class="card mt-20">
-      <h3>Temporary Marketplace Cleanup</h3>
-      <p class="muted">Permanently remove every non-admin account, all product listings, and all order history. The admin account will remain.</p>
-      <button class="btn-danger full-width mt-10" onclick="purgeNonAdminData()">Delete Non-Admin Data</button>
-    </div>
-
     <div class="admin-tabs">
       <button class="tab-btn active" onclick="switchAdminTab('reports', this)">📊 Generate Reports</button>
       <button class="tab-btn" onclick="switchAdminTab('users', this)">👥 Manage Users</button>

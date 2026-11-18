@@ -694,51 +694,6 @@ def admin_list_users():
     return jsonify(users)
 
 
-@app.route("/api/admin/purge-non-admin-data", methods=["POST"])
-@auth_required(roles=["admin"])
-def admin_purge_non_admin_data():
-    upload_paths = [
-        entry.path for entry in os.scandir(UPLOAD_FOLDER)
-        if entry.is_file(follow_symlinks=False) and allowed_file(entry.name)
-    ]
-
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM users WHERE role != 'admin'")
-    deleted_users = cur.fetchone()[0]
-    cur.execute("SELECT COUNT(*) FROM products")
-    deleted_products = cur.fetchone()[0]
-    cur.execute("SELECT COUNT(*) FROM orders")
-    deleted_orders = cur.fetchone()[0]
-    cur.execute("SELECT COUNT(*) FROM order_items")
-    deleted_order_items = cur.fetchone()[0]
-
-    cur.execute("DELETE FROM order_items")
-    cur.execute("DELETE FROM orders")
-    cur.execute("DELETE FROM products")
-    cur.execute("DELETE FROM users WHERE role != 'admin'")
-    conn.commit()
-    conn.close()
-
-    for path in upload_paths:
-        os.remove(path)
-
-    for token, identity in list(ACTIVE_TOKENS.items()):
-        if identity["role"] != "admin":
-            del ACTIVE_TOKENS[token]
-
-    return jsonify({
-        "message": "All non-admin accounts and marketplace data were removed.",
-        "deleted": {
-            "users": deleted_users,
-            "products": deleted_products,
-            "orders": deleted_orders,
-            "order_items": deleted_order_items,
-            "uploaded_images": len(upload_paths)
-        }
-    })
-
-
 @app.route("/api/admin/users/<int:user_id>/toggle", methods=["PUT"])
 @auth_required(roles=["admin"])
 def admin_toggle_user(user_id):

@@ -80,28 +80,6 @@ async function loadAllAdminData() {
   await loadProducts();
 }
 
-async function purgeNonAdminData() {
-  const confirmed = window.confirm(
-    "Permanently remove every non-admin account, all products, and all order history? This cannot be undone."
-  );
-  if (!confirmed) return;
-
-  const res = await fetch(`${API_BASE}/admin/purge-non-admin-data`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${adminToken}` }
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    showToast(data.error || "Marketplace cleanup failed.");
-    return;
-  }
-
-  showToast(
-    `Cleanup complete: removed ${data.deleted.users} accounts, ${data.deleted.products} products, and ${data.deleted.orders} orders.`
-  );
-  await loadAllAdminData();
-}
-
 // 1. Generate Reports
 async function loadReports() {
   const res = await fetch(`${API_BASE}/admin/reports`, {
