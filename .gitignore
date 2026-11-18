@@ -1,0 +1,7 @@
+backend/artisan_marketplace.db
+backend/static/uploads/
+.env
+.venv/
+venv/
+__pycache__/
+*.py[cod]

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kalakriti Admin Portal | Governance & Reports</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="admin-body">
+  <header class="navbar admin-navbar">
+    <div class="nav-brand">
+      <span class="brand-icon">🛡️</span>
+      <div>
+        <h1>Kalakriti Admin Portal</h1>
+        <small>Marketplace Governance, Orders & Analytics</small>
+      </div>
+    </div>
+    <div class="nav-links">
+      <a href="index.html" class="admin-portal-link">← Back to Public Website</a>
+      <button class="btn-sm btn-danger hidden" id="admin-logout-btn" onclick="adminLogout()">Admin Logout</button>
+    </div>
+  </header>
+
+  <!-- STEP 1: ADMIN LOGIN VIEW (Matches Flowchart: Admin -> Admin Login -> Valid Credentials?) -->
+  <main class="container" id="admin-login-section">
+    <div class="card auth-card-center">
+      <h2>Administrator Sign In</h2>
+      <p class="muted">Restricted access for platform administrators only.</p>
+      <form onsubmit="handleAdminLogin(event)">
+        <label>Admin Email</label>
+        <input type="email" id="admin-email" required placeholder="Enter admin email" />
+        <label>Admin Password</label>
+        <input type="password" id="admin-password" required placeholder="••••••••" />
+        <button type="submit" class="btn-primary full-width">Login to Admin Console</button>
+      </form>
+    </div>
+  </main>
+
+  <!-- STEP 2: ADMIN DASHBOARD (Manage Users -> Manage Products -> View & Update Orders -> Generate Reports) -->
+  <main class="container hidden" id="admin-dashboard-section">
+    <div class="admin-tabs">
+      <button class="tab-btn active" onclick="switchAdminTab('reports', this)">📊 Generate Reports</button>
+      <button class="tab-btn" onclick="switchAdminTab('users', this)">👥 Manage Users</button>
+      <button class="tab-btn" onclick="switchAdminTab('products', this)">🏺 Manage Products</button>
+      <button class="tab-btn" onclick="switchAdminTab('orders', this)">📦 View & Update Orders</button>
+    </div>
+
+    <!-- TAB 1: GENERATE REPORTS -->
+    <section id="admin-tab-reports" class="admin-panel">
+      <div class="section-header">
+        <h2>Marketplace Performance & Sales Reports</h2>
+        <button class="btn-primary" onclick="downloadSalesCSV()">⬇ Export CSV Report</button>
+      </div>
+
+      <div class="kpi-grid" id="admin-kpi-grid"></div>
+
+      <div class="artisan-grid mt-20">
+        <div class="card">
+          <h3>Category Inventory Breakdown</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Craft Category</th>
+                <th>Listed Items</th>
+                <th>Total Stock Units</th>
+              </tr>
+            </thead>
+            <tbody id="report-category-tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <h3>Artisan Sales Leaderboard</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Artisan</th>
+                <th>Location</th>
+                <th>Units Sold</th>
+                <th>Total Revenue (₹)</th>
+              </tr>
+            </thead>
+            <tbody id="report-artisan-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: MANAGE USERS (Artisans & Customers) -->
+    <section id="admin-tab-users" class="admin-panel hidden">
+      <div class="card">
+        <h3>Manage Registered Artisans & Customers</h3>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Location / Specialty</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="admin-users-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: MANAGE PRODUCTS -->
+    <section id="admin-tab-products" class="admin-panel hidden">
+      <div class="card">
+        <h3>Add Handcraft Listing</h3>
+        <p class="muted">Product IDs are generated automatically and cannot be changed.</p>
+        <form id="admin-add-product-form" onsubmit="adminAddProduct(event)">
+          <label>Artisan</label>
+          <select id="admin-new-artisan" required>
+            <option value="">Select an artisan</option>
+          </select>
+          <div class="form-row">
+            <div>
+              <label>Craft Title</label>
+              <input type="text" id="admin-new-title" required />
+            </div>
+            <div>
+              <label>Category</label>
+              <input type="text" id="admin-new-category" required />
+            </div>
+          </div>
+          <div class="form-row">
+            <div>
+              <label>Price (₹)</label>
+              <input type="number" id="admin-new-price" min="0.01" step="0.01" required />
+            </div>
+            <div>
+              <label>Stock</label>
+              <input type="number" id="admin-new-stock" min="0" step="1" value="1" required />
+            </div>
+          </div>
+          <div class="form-row">
+            <div>
+              <label>Availability</label>
+              <select id="admin-new-availability">
+                <option value="1">Available</option>
+                <option value="0">Unavailable</option>
+              </select>
+            </div>
+            <div>
+              <label>Photo URL (optional if uploading)</label>
+              <input type="url" id="admin-new-image-url" />
+            </div>
+          </div>
+          <label>Upload Photo</label>
+          <input type="file" id="admin-new-image-file" accept="image/*" />
+          <label>Description</label>
+          <textarea id="admin-new-description" rows="3"></textarea>
+          <button type="submit" class="btn-primary">Add Product</button>
+        </form>
+      </div>
+
+      <div class="card mt-20">
+        <h3>All Handcraft Listings Moderation</h3>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Photo</th>
+                <th>Craft Title</th>
+                <th>Artisan</th>
+                <th>Category</th>
+                <th>Price (₹)</th>
+                <th>Stock</th>
+                <th>Availability</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="admin-products-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: VIEW AND UPDATE ORDERS -->
+    <section id="admin-tab-orders" class="admin-panel hidden">
+      <div class="card">
+        <h3>Customer Orders & Fulfillment Status</h3>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Order ID</th>
+                <th>Customer</th>
+                <th>Items Ordered</th>
+                <th>Total (₹)</th>
+                <th>Shipping Address</th>
+                <th>Current Status</th>
+                <th>Update Status</th>
+              </tr>
+            </thead>
+            <tbody id="admin-orders-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="js/admin.js"></script>
+</body>
+</html>

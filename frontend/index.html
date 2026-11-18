@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kalakriti | Local Artisan & Handcraft Marketplace</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <!-- Top Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-brand" onclick="showSection('marketplace')">
+      <span class="brand-icon">🏺</span>
+      <div>
+        <h1>Kalakriti</h1>
+        <small>Authentic Local Artisans & Handcrafts</small>
+      </div>
+    </div>
+
+    <nav class="nav-links">
+      <button class="nav-btn active" id="nav-marketplace" onclick="showSection('marketplace')">Browse Crafts</button>
+      <button class="nav-btn hidden" id="nav-artisan" onclick="showSection('artisan-dashboard')">Artisan Studio</button>
+      <button class="nav-btn hidden" id="nav-orders" onclick="showSection('customer-orders')">My Orders</button>
+      <button class="nav-btn cart-btn" id="nav-cart" onclick="toggleCartDrawer()">
+        Cart (<span id="cart-count">0</span>)
+      </button>
+      <button class="nav-btn primary-outline" id="nav-auth" onclick="openAuthModal()">Public Login / Register</button>
+      <div class="user-pill hidden" id="user-pill">
+        <span id="user-greeting"></span>
+        <button class="btn-sm btn-danger" onclick="logoutUser()">Logout</button>
+      </div>
+      <a href="admin.html" class="admin-portal-link" title="Separate Administrator Login Portal">Admin Portal →</a>
+    </nav>
+  </header>
+
+  <!-- Hero Banner -->
+  <section class="hero" id="hero-banner">
+    <div class="hero-content">
+      <span class="badge">Direct from Rural & Regional Makers</span>
+      <h2>Handcrafted Stories, Carved & Woven with Heritage</h2>
+      <p>Discover authentic woodwork, terracotta pottery, Kasuti handlooms, and brassware directly from verified local artisans.</p>
+    </div>
+  </section>
+
+  <!-- SECTION 1: CUSTOMER / PUBLIC MARKETPLACE FLOW -->
+  <main class="container" id="section-marketplace">
+    <!-- Search & Filter Bar (Matches Flowchart: Browse -> Search / Filter Products) -->
+    <div class="filter-bar card">
+      <input type="text" id="search-input" placeholder="Search crafts, artisans, or locations (e.g., Sagara, Rosewood, Warli)..." oninput="loadProducts()" />
+      <select id="category-filter" onchange="loadProducts()">
+        <option value="All">All Craft Categories</option>
+        <option value="Woodwork">Woodwork</option>
+        <option value="Pottery">Pottery & Terracotta</option>
+        <option value="Textiles">Handloom & Textiles</option>
+        <option value="Metalwork">Brass & Metalwork</option>
+        <option value="Bamboo & Cane">Bamboo & Cane</option>
+      </select>
+      <input type="number" id="max-price-filter" placeholder="Max Price (₹)" min="0" oninput="loadProducts()" />
+      <button class="btn-secondary" onclick="resetFilters()">Reset</button>
+    </div>
+
+    <!-- Product Grid -->
+    <div id="product-grid" class="product-grid"></div>
+  </main>
+
+  <!-- SECTION 2: CUSTOMER ORDERS VIEW -->
+  <section class="container hidden" id="section-customer-orders">
+    <div class="section-header">
+      <h2>My Placed Orders</h2>
+      <button class="btn-secondary" onclick="showSection('marketplace')">← Continue Shopping</button>
+    </div>
+    <div id="customer-orders-list" class="orders-list"></div>
+  </section>
+
+  <!-- SECTION 3: ARTISAN STUDIO FLOW (Manage Profile -> Add/Update Products -> Set Price & Availability) -->
+  <section class="container hidden" id="section-artisan-dashboard">
+    <div class="section-header">
+      <h2>Artisan Studio Workspace</h2>
+      <span class="badge">Artisan Account</span>
+    </div>
+
+    <div class="artisan-grid">
+      <!-- Manage Profile -->
+      <div class="card">
+        <h3>1. Manage Artisan Profile</h3>
+        <form id="artisan-profile-form" onsubmit="updateArtisanProfile(event)">
+          <label>Full Name / Workshop Name</label>
+          <input type="text" id="art-name" required />
+          <label>Craft Specialty</label>
+          <input type="text" id="art-specialty" placeholder="e.g., Sandalwood Carving, Terracotta" />
+          <label>Village / City Location</label>
+          <input type="text" id="art-location" placeholder="e.g., Puttur, Karnataka" />
+          <label>Contact Phone</label>
+          <input type="text" id="art-phone" />
+          <label>Artisan Story / Bio</label>
+          <textarea id="art-bio" rows="3"></textarea>
+          <button type="submit" class="btn-primary full-width">Save Profile</button>
+        </form>
+      </div>
+
+      <!-- Add New Product with Image Storage -->
+      <div class="card">
+        <h3>2. Add New Handcraft Product</h3>
+        <form id="add-product-form" onsubmit="addArtisanProduct(event)">
+          <label>Craft Title</label>
+          <input type="text" id="prod-title" required placeholder="e.g., Hand-Carved Sandalwood Peacock" />
+          <div class="form-row">
+            <div>
+              <label>Category</label>
+              <select id="prod-category">
+                <option value="Woodwork">Woodwork</option>
+                <option value="Pottery">Pottery</option>
+                <option value="Textiles">Textiles</option>
+                <option value="Metalwork">Metalwork</option>
+                <option value="Bamboo & Cane">Bamboo & Cane</option>
+              </select>
+            </div>
+            <div>
+              <label>Price (₹ INR)</label>
+              <input type="number" id="prod-price" min="1" step="1" required placeholder="1200" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div>
+              <label>Available Stock Qty</label>
+              <input type="number" id="prod-stock" min="0" value="5" required />
+            </div>
+            <div>
+              <label>Availability Status</label>
+              <select id="prod-available">
+                <option value="1">Available for Sale</option>
+                <option value="0">Out of Stock / Hidden</option>
+              </select>
+            </div>
+          </div>
+          <label>Upload Craft Photo (Image Storage)</label>
+          <input type="file" id="prod-image-file" accept="image/*" />
+          <label>Or External Image URL (Optional)</label>
+          <input type="url" id="prod-image-url" placeholder="https://..." />
+          <label>Craft Description & Materials</label>
+          <textarea id="prod-desc" rows="2" required></textarea>
+          <button type="submit" class="btn-primary full-width">Publish Craft</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Artisan Product Inventory: Update Price & Availability -->
+    <div class="card mt-20">
+      <h3>3. My Listed Crafts (Update Price, Stock & Availability)</h3>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Photo</th>
+              <th>Title</th>
+              <th>Category</th>
+              <th>Price (₹)</th>
+              <th>Stock</th>
+              <th>Availability</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="artisan-products-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Incoming Orders for Artisan -->
+    <div class="card mt-20">
+      <h3>4. Customer Orders for My Crafts</h3>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Order #</th>
+              <th>Craft</th>
+              <th>Qty</th>
+              <th>Subtotal (₹)</th>
+              <th>Customer</th>
+              <th>Shipping Address</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="artisan-orders-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRODUCT DETAILS MODAL (Matches Flowchart: View Product Details -> Add to Cart) -->
+  <div class="modal hidden" id="product-detail-modal">
+    <div class="modal-content modal-lg">
+      <button class="close-btn" onclick="closeProductModal()">×</button>
+      <div id="product-detail-body"></div>
+    </div>
+  </div>
+
+  <!-- PUBLIC LOGIN / REGISTER MODAL (Customer & Artisan) -->
+  <div class="modal hidden" id="auth-modal">
+    <div class="modal-content">
+      <button class="close-btn" onclick="closeAuthModal()">×</button>
+      <div class="auth-tabs">
+        <button class="tab-btn active" id="tab-register" onclick="switchAuthTab('register')">New Registration</button>
+        <button class="tab-btn" id="tab-login" onclick="switchAuthTab('login')">Public Login</button>
+      </div>
+
+      <!-- Login Form -->
+      <form id="public-login-form" class="hidden" onsubmit="handlePublicLogin(event)">
+        <h3>Sign In (Customer or Artisan)</h3>
+        <label>Email Address</label>
+        <input type="email" id="login-email" required placeholder="Enter your email address" />
+        <label>Password</label>
+        <input type="password" id="login-password" required placeholder="••••••••" />
+        <button type="submit" class="btn-primary full-width">Login</button>
+      </form>
+
+      <!-- Register Form -->
+      <form id="public-register-form" onsubmit="handlePublicRegister(event)">
+        <h3>Create Public Account</h3>
+        <label>Account Type (User Type)</label>
+        <select id="reg-role" onchange="toggleArtisanFields()">
+          <option value="customer">Customer (Browse & Buy Handcrafts)</option>
+          <option value="artisan">Artisan (Sell & Manage Handcrafts)</option>
+        </select>
+        <label>Full Name</label>
+        <input type="text" id="reg-name" required />
+        <label>Email Address</label>
+        <input type="email" id="reg-email" required />
+        <label>Password</label>
+        <input type="password" id="reg-password" minlength="4" required />
+        <label>City / Village Location</label>
+        <input type="text" id="reg-location" placeholder="e.g., Puttur, Karnataka" />
+        <div id="reg-artisan-extra" class="hidden">
+          <label>Craft Specialty</label>
+          <input type="text" id="reg-specialty" placeholder="e.g., Wood Carving, Pottery" />
+          <label>Short Bio</label>
+          <textarea id="reg-bio" rows="2"></textarea>
+        </div>
+        <button type="submit" class="btn-primary full-width">Register & Continue</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- SHOPPING CART & CHECKOUT DRAWER (Matches Flowchart: Add to Cart -> Place Order) -->
+  <div class="drawer hidden" id="cart-drawer">
+    <div class="drawer-header">
+      <h3>Your Craft Cart</h3>
+      <button class="close-btn" onclick="toggleCartDrawer()">×</button>
+    </div>
+    <div id="cart-items-container" class="drawer-body"></div>
+    <div class="drawer-footer">
+      <div class="cart-total">
+        <span>Total Amount:</span>
+        <strong id="cart-total-amount">₹0</strong>
+      </div>
+      <label>Delivery Address</label>
+      <textarea id="checkout-address" rows="2" placeholder="Enter full shipping address with PIN code..."></textarea>
+      <label>Payment Method</label>
+      <select id="checkout-payment">
+        <option value="Cash on Delivery" selected>Cash on Delivery</option>
+      </select>
+      <button class="btn-primary full-width mt-10" onclick="placeOrder()">Place Order</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
