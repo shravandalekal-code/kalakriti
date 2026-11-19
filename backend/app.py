@@ -4,10 +4,12 @@ import uuid
 import csv
 import io
 import math
+import psycopg
 from datetime import datetime
 from functools import wraps
 from flask import Flask, request, jsonify, send_from_directory, Response
 from flask_cors import CORS
+from psycopg.rows import dict_row
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
@@ -16,10 +18,15 @@ cors_origins = [origin.strip() for origin in os.environ.get("CORS_ORIGINS", "*")
 CORS(app, origins=cors_origins)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+USE_POSTGRES = bool(DATABASE_URL)
+if USE_POSTGRES and not DATABASE_URL.startswith(("postgres://", "postgresql://")):
+    raise RuntimeError("DATABASE_URL must be a PostgreSQL connection URL.")
 DB_PATH = os.environ.get("DATABASE_PATH", os.path.join(BASE_DIR, "artisan_marketplace.db"))
 UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", os.path.join(BASE_DIR, "static", "uploads"))
 BACKEND_PUBLIC_URL = os.environ.get("BACKEND_PUBLIC_URL", "http://127.0.0.1:5000").rstrip("/")
-os.makedirs(os.path.dirname(DB_PATH) or BASE_DIR, exist_ok=True)
+if not USE_POSTGRES:
+    os.makedirs(os.path.dirname(DB_PATH) or BASE_DIR, exist_ok=True)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "gif"}
@@ -34,20 +41,69 @@ def uploaded_image_url(filename):
     return f"{BACKEND_PUBLIC_URL}/uploads/{filename}"
 
 
+class PostgresCursor:
+    def __init__(self, cursor):
+        self.cursor = cursor
+
+    def execute(self, query, params=()):
+        self.cursor.execute(query.replace("?", "%s"), params)
+        return self
+
+    def fetchone(self):
+        return self.cursor.fetchone()
+
+    def fetchall(self):
+        return self.cursor.fetchall()
+
+
+class PostgresConnection:
+    def __init__(self, connection):
+        self.connection = connection
+
+    def cursor(self):
+        return PostgresCursor(self.connection.cursor())
+
+    def commit(self):
+        self.connection.commit()
+
+    def close(self):
+        self.connection.close()
+
+
 def get_db():
+    if USE_POSTGRES:
+        return PostgresConnection(
+            psycopg.connect(DATABASE_URL, connect_timeout=10, row_factory=dict_row)
+        )
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 
+def row_value(row, index=0):
+    if isinstance(row, dict):
+        return list(row.values())[index]
+    return row[index]
+
+
+def insert_and_get_id(cursor, query, params):
+    if USE_POSTGRES:
+        cursor.execute(f"{query.rstrip()} RETURNING id", params)
+        return cursor.fetchone()["id"]
+    cursor.execute(query, params)
+    return cursor.lastrowid
+
+
 def init_db():
     conn = get_db()
     cur = conn.cursor()
+    id_column = "id SERIAL PRIMARY KEY" if USE_POSTGRES else "id INTEGER PRIMARY KEY AUTOINCREMENT"
+    real_type = "DOUBLE PRECISION" if USE_POSTGRES else "REAL"
 
     # Users table: roles -> 'admin', 'artisan', 'customer'
-    cur.execute("""
+    cur.execute(f"""
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            {id_column},
             name TEXT NOT NULL,
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
@@ -62,14 +118,14 @@ def init_db():
     """)
 
     # Products table
-    cur.execute("""
+    cur.execute(f"""
         CREATE TABLE IF NOT EXISTS products (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            {id_column},
             artisan_id INTEGER NOT NULL,
             title TEXT NOT NULL,
             category TEXT NOT NULL,
             description TEXT NOT NULL,
-            price REAL NOT NULL,
+            price {real_type} NOT NULL,
             stock INTEGER NOT NULL DEFAULT 1,
             is_available INTEGER NOT NULL DEFAULT 1,
             image_url TEXT DEFAULT '',
@@ -79,11 +135,11 @@ def init_db():
     """)
 
     # Orders table
-    cur.execute("""
+    cur.execute(f"""
         CREATE TABLE IF NOT EXISTS orders (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            {id_column},
             customer_id INTEGER NOT NULL,
-            total_amount REAL NOT NULL,
+            total_amount {real_type} NOT NULL,
             shipping_address TEXT NOT NULL,
             payment_method TEXT DEFAULT 'Cash on Delivery',
             status TEXT NOT NULL DEFAULT 'Pending',
@@ -93,14 +149,14 @@ def init_db():
     """)
 
     # Order Items table
-    cur.execute("""
+    cur.execute(f"""
         CREATE TABLE IF NOT EXISTS order_items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            {id_column},
             order_id INTEGER NOT NULL,
             product_id INTEGER NOT NULL,
             artisan_id INTEGER NOT NULL,
             quantity INTEGER NOT NULL,
-            unit_price REAL NOT NULL,
+            unit_price {real_type} NOT NULL,
             FOREIGN KEY (order_id) REFERENCES orders(id),
             FOREIGN KEY (product_id) REFERENCES products(id)
         )
@@ -108,7 +164,7 @@ def init_db():
 
     # Seed only the platform admin in a new database; public users register themselves.
     cur.execute("SELECT COUNT(*) FROM users")
-    if cur.fetchone()[0] == 0:
+    if row_value(cur.fetchone()) == 0:
         admin_password = os.environ.get("KALAKRITI_ADMIN_PASSWORD")
         if not admin_password:
             conn.close()
@@ -176,11 +232,10 @@ def register():
         return jsonify({"error": "Email is already registered."}), 409
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cur.execute("""
+    user_id = insert_and_get_id(cur, """
         INSERT INTO users (name, email, password_hash, role, bio, location, craft_specialty, phone, is_active, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
     """, (name, email, generate_password_hash(password), role, bio, location, craft_specialty, phone, now))
-    user_id = cur.lastrowid
     conn.commit()
     conn.close()
 
@@ -387,11 +442,10 @@ def artisan_products():
         image_url = "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=600&q=80"
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cur.execute("""
+    prod_id = insert_and_get_id(cur, """
         INSERT INTO products (artisan_id, title, category, description, price, stock, is_available, image_url, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (request.user_id, title, category, description, price, stock, is_available, image_url, now))
-    prod_id = cur.lastrowid
     conn.commit()
     conn.close()
     return jsonify({"message": "Product added successfully", "id": prod_id}), 201
@@ -523,11 +577,10 @@ def place_order():
         validated_items.append((prod, qty))
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cur.execute("""
+    order_id = insert_and_get_id(cur, """
         INSERT INTO orders (customer_id, total_amount, shipping_address, payment_method, status, created_at)
         VALUES (?, ?, ?, ?, 'Pending', ?)
     """, (request.user_id, total_amount, shipping_address, payment_method, now))
-    order_id = cur.lastrowid
 
     for prod, qty in validated_items:
         cur.execute("""
@@ -625,11 +678,10 @@ def admin_products():
         image_url = "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=600&q=80"
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cur.execute("""
+    product_id = insert_and_get_id(cur, """
         INSERT INTO products (artisan_id, title, category, description, price, stock, is_available, image_url, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (artisan_id, title, category, description, price, stock, is_available, image_url, now))
-    product_id = cur.lastrowid
     conn.commit()
     conn.close()
     return jsonify({"message": "Product added successfully", "id": product_id}), 201
@@ -713,18 +765,18 @@ def admin_reports():
     cur = conn.cursor()
 
     cur.execute("SELECT COUNT(*) FROM users WHERE role = 'artisan'")
-    total_artisans = cur.fetchone()[0]
+    total_artisans = row_value(cur.fetchone())
 
     cur.execute("SELECT COUNT(*) FROM users WHERE role = 'customer'")
-    total_customers = cur.fetchone()[0]
+    total_customers = row_value(cur.fetchone())
 
     cur.execute("SELECT COUNT(*) FROM products")
-    total_products = cur.fetchone()[0]
+    total_products = row_value(cur.fetchone())
 
     cur.execute("SELECT COUNT(*), COALESCE(SUM(total_amount), 0) FROM orders WHERE status != 'Cancelled'")
     order_stats = cur.fetchone()
-    total_orders = order_stats[0]
-    total_revenue = order_stats[1]
+    total_orders = row_value(order_stats)
+    total_revenue = row_value(order_stats, 1)
 
     cur.execute("""
         SELECT category, COUNT(*) AS product_count, SUM(stock) AS total_stock

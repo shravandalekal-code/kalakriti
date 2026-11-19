@@ -1,6 +1,6 @@
 # Kalakriti — Local Artist & Handcraft Marketplace
 
-Full-stack web application built according to the **System Architecture Flow** and **Flowchart** (Separate Frontend & Python Flask Backend with SQLite Database & Image Storage).
+Full-stack web application built according to the **System Architecture Flow** and **Flowchart** (Separate Frontend & Python Flask Backend with SQLite locally and PostgreSQL for hosted deployments).
 
 ## Folder Structure
 ```text
@@ -34,7 +34,7 @@ Set a unique initial admin password before starting the backend. In PowerShell:
 $env:KALAKRITI_ADMIN_PASSWORD = "replace-with-a-unique-password"
 python app.py
 ```
-Keep this password out of source control. The first run initializes the admin account (`admin@kalakriti.in`) and the SQLite database (`artisan_marketplace.db`) on `http://127.0.0.1:5000`. Sample artisan and customer accounts are seeded with random, undisclosed passwords; register a new public account to sign in as a customer or artisan.
+Keep this password out of source control. Without `DATABASE_URL`, the first run initializes the admin account (`admin@kalakriti.in`) and the SQLite database (`artisan_marketplace.db`) on `http://127.0.0.1:5000`. Register a new public account to sign in as a customer or artisan.
 
 ### 2. Start the Frontend
 Open `frontend/index.html` (Public Portal) or `frontend/admin.html` (Admin Portal) in your browser, or serve the `frontend/` folder with VS Code Live Server / `python -m http.server 8000`.
@@ -48,12 +48,13 @@ The backend and frontend deploy as separate Render services.
 2. Set **Root Directory** to `backend`.
 3. Use **Build Command** `pip install -r requirements.txt`.
 4. Use **Start Command** `gunicorn wsgi:app --workers 1 --bind 0.0.0.0:$PORT`.
-5. Add a persistent disk mounted at `/var/data`. Set these environment variables:
+5. Create a [Neon](https://console.neon.tech/signup) project on its Free plan. Neon currently lists a $0 plan with no credit card required, including 1 GB of storage and 100 compute-hours per month per project. Check its current limits before production use.
+6. Copy the pooled PostgreSQL connection string from the Neon dashboard. In the Render service's Environment settings, set:
    - `KALAKRITI_ADMIN_PASSWORD`: a strong password for the initial admin account.
-   - `DATABASE_PATH`: `/var/data/artisan_marketplace.db`
-   - `UPLOAD_FOLDER`: `/var/data/uploads`
+   - `DATABASE_URL`: the Neon pooled connection string (keep it secret; do not put it in GitHub).
    - `BACKEND_PUBLIC_URL`: the backend service's HTTPS URL, such as `https://kalakriti-api.onrender.com`.
    - `CORS_ORIGINS`: the frontend service's HTTPS URL, set after creating the frontend service.
+7. Deploy the backend. On first startup, it creates the PostgreSQL tables and initializes the admin account if the database is empty. When `DATABASE_URL` is unset, local development continues to use SQLite.
 
 ### Frontend Static Site
 1. Create a Static Site from the same repository and select the `main` branch.
@@ -65,4 +66,4 @@ The backend and frontend deploy as separate Render services.
 4. Commit and push that change, then wait for the static site to redeploy.
 5. Set the backend's `CORS_ORIGINS` environment variable to the frontend service's HTTPS URL and redeploy the backend.
 
-The database and uploaded images must remain on the persistent disk; the service's ordinary filesystem is not persistent across redeployments. Set `KALAKRITI_ADMIN_PASSWORD` before the backend's first start with an empty database. Keep it in Render's environment settings, not in GitHub.
+The hosted database is PostgreSQL on Neon; Render's ordinary filesystem is not persistent across redeployments. Uploaded images saved under `UPLOAD_FOLDER` still use Render's temporary filesystem, so use hosted image URLs or add persistent object storage if uploaded images must survive deployments. Switching to Neon creates a new, empty database; it does not recover or copy user records already lost from Render's temporary SQLite database. Back up or import any recoverable data before switching databases.
