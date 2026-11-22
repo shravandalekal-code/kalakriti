@@ -54,7 +54,7 @@ The backend and frontend deploy as separate Render services.
    - `DATABASE_URL`: the Neon pooled connection string (keep it secret; do not put it in GitHub).
    - `BACKEND_PUBLIC_URL`: the backend service's HTTPS URL, such as `https://kalakriti-api.onrender.com`.
    - `CORS_ORIGINS`: the frontend service's HTTPS URL, set after creating the frontend service.
-7. Deploy the backend. On first startup, it creates the PostgreSQL tables and initializes the admin account if the database is empty. When `DATABASE_URL` is unset, local development continues to use SQLite.
+7. Deploy the backend. On first startup, it creates the PostgreSQL tables and initializes the admin account if the database is empty. On Render, the backend refuses to start without `DATABASE_URL` rather than silently saving accounts to temporary SQLite storage. Local development continues to use SQLite when `DATABASE_URL` is unset.
 
 ### Frontend Static Site
 1. Create a Static Site from the same repository and select the `main` branch.

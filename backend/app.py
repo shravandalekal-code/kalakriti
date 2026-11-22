@@ -22,6 +22,19 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 USE_POSTGRES = bool(DATABASE_URL)
 if USE_POSTGRES and not DATABASE_URL.startswith(("postgres://", "postgresql://")):
     raise RuntimeError("DATABASE_URL must be a PostgreSQL connection URL.")
+
+
+def require_persistent_hosted_database():
+    if os.environ.get("RENDER", "").lower() == "true" and not DATABASE_URL:
+        raise RuntimeError(
+            "DATABASE_URL is required on Render. Configure a persistent PostgreSQL "
+            "database before starting the service; SQLite on Render's filesystem "
+            "can lose data after a restart or redeploy."
+        )
+
+
+require_persistent_hosted_database()
+
 DB_PATH = os.environ.get("DATABASE_PATH", os.path.join(BASE_DIR, "artisan_marketplace.db"))
 UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", os.path.join(BASE_DIR, "static", "uploads"))
 BACKEND_PUBLIC_URL = os.environ.get("BACKEND_PUBLIC_URL", "http://127.0.0.1:5000").rstrip("/")

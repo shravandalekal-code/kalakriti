@@ -1,7 +1,12 @@
 import unittest
 from unittest.mock import patch
 
-from app import PostgresCursor, insert_and_get_id, row_value
+from app import (
+    PostgresCursor,
+    insert_and_get_id,
+    require_persistent_hosted_database,
+    row_value,
+)
 
 
 class FakeCursor:
@@ -19,6 +24,13 @@ class FakeCursor:
 
 
 class DatabaseAdapterTests(unittest.TestCase):
+    def test_render_requires_a_persistent_database_url(self):
+        with patch.dict("os.environ", {"RENDER": "true"}), patch(
+            "app.DATABASE_URL", ""
+        ):
+            with self.assertRaisesRegex(RuntimeError, "DATABASE_URL is required on Render"):
+                require_persistent_hosted_database()
+
     def test_postgres_cursor_translates_sqlite_placeholders(self):
         cursor = FakeCursor()
 
