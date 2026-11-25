@@ -54,6 +54,7 @@ The backend and frontend deploy as separate Render services.
    - `DATABASE_URL`: the Neon pooled connection string (keep it secret; do not put it in GitHub).
    - `BACKEND_PUBLIC_URL`: the backend service's HTTPS URL, such as `https://kalakriti-api.onrender.com`.
    - `CORS_ORIGINS`: the frontend service's HTTPS URL, set after creating the frontend service.
+   - `CLOUDINARY_URL`: the Cloudinary connection URL from the Cloudinary console (keep it secret; do not put it in GitHub).
 7. Deploy the backend. On first startup, it creates the PostgreSQL tables and initializes the admin account if the database is empty. On Render, the backend refuses to start without `DATABASE_URL` rather than silently saving accounts to temporary SQLite storage. Local development continues to use SQLite when `DATABASE_URL` is unset.
 
 ### Frontend Static Site
@@ -66,4 +67,4 @@ The backend and frontend deploy as separate Render services.
 4. Commit and push that change, then wait for the static site to redeploy.
 5. Set the backend's `CORS_ORIGINS` environment variable to the frontend service's HTTPS URL and redeploy the backend.
 
-The hosted database is PostgreSQL on Neon; Render's ordinary filesystem is not persistent across redeployments. Uploaded images saved under `UPLOAD_FOLDER` still use Render's temporary filesystem, so use hosted image URLs or add persistent object storage if uploaded images must survive deployments. Switching to Neon creates a new, empty database; it does not recover or copy user records already lost from Render's temporary SQLite database. Back up or import any recoverable data before switching databases.
+The hosted database is PostgreSQL on Neon; Render's ordinary filesystem is not persistent across redeployments. On Render, uploaded product images are stored in Cloudinary when `CLOUDINARY_URL` is configured. Local development without Cloudinary continues to store uploads under `UPLOAD_FOLDER`. Existing `/uploads/...` image URLs whose files disappeared from Render must be re-uploaded or replaced with hosted image URLs. Switching to Neon creates a new, empty database; it does not recover or copy user records already lost from Render's temporary SQLite database. Back up or import any recoverable data before switching databases.

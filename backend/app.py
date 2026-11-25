@@ -4,14 +4,17 @@ import uuid
 import csv
 import io
 import math
+import cloudinary
+import cloudinary.uploader
 import psycopg
 from datetime import datetime
 from functools import wraps
 from flask import Flask, request, jsonify, send_from_directory, Response
 from flask_cors import CORS
+from cloudinary.exceptions import Error as CloudinaryError
 from psycopg.rows import dict_row
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
+from werkzeug.datastructures import FileStorage
 
 app = Flask(__name__)
 cors_origins = [origin.strip() for origin in os.environ.get("CORS_ORIGINS", "*").split(",") if origin.strip()]
@@ -38,6 +41,9 @@ require_persistent_hosted_database()
 DB_PATH = os.environ.get("DATABASE_PATH", os.path.join(BASE_DIR, "artisan_marketplace.db"))
 UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", os.path.join(BASE_DIR, "static", "uploads"))
 BACKEND_PUBLIC_URL = os.environ.get("BACKEND_PUBLIC_URL", "http://127.0.0.1:5000").rstrip("/")
+CLOUDINARY_URL = os.environ.get("CLOUDINARY_URL", "").strip()
+if CLOUDINARY_URL:
+    cloudinary.config(secure=True)
 if not USE_POSTGRES:
     os.makedirs(os.path.dirname(DB_PATH) or BASE_DIR, exist_ok=True)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -46,12 +52,55 @@ ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "gif"}
 ACTIVE_TOKENS = {}  # token -> {"user_id": int, "role": str}
 
 
+class ImageStorageError(Exception):
+    def __init__(self, message, status_code=503):
+        super().__init__(message)
+        self.status_code = status_code
+
+
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 def uploaded_image_url(filename):
     return f"{BACKEND_PUBLIC_URL}/uploads/{filename}"
+
+
+def store_uploaded_image(image_file: FileStorage) -> str:
+    filename = image_file.filename or ""
+    if not allowed_file(filename):
+        raise ImageStorageError(
+            "Unsupported image format. Use PNG, JPG, JPEG, WEBP, or GIF.",
+            status_code=400,
+        )
+
+    if CLOUDINARY_URL:
+        try:
+            result = cloudinary.uploader.upload(
+                image_file.stream,
+                folder="kalakriti/products",
+                resource_type="image",
+                use_filename=False,
+                unique_filename=True,
+            )
+        except CloudinaryError as exc:
+            raise ImageStorageError(
+                "Cloudinary could not store the image. Check the Cloudinary configuration and try again."
+            ) from exc
+
+        secure_url = result.get("secure_url")
+        if not secure_url:
+            raise ImageStorageError("Cloudinary did not return a secure image URL.")
+        return secure_url
+
+    if os.environ.get("RENDER", "").lower() == "true":
+        raise ImageStorageError(
+            "Image uploads are not configured. Add CLOUDINARY_URL to the Render backend environment."
+        )
+
+    stored_filename = f"{uuid.uuid4().hex}.{filename.rsplit('.', 1)[1].lower()}"
+    image_file.save(os.path.join(UPLOAD_FOLDER, stored_filename))
+    return uploaded_image_url(stored_filename)
 
 
 class PostgresCursor:
@@ -432,11 +481,12 @@ def artisan_products():
 
         if "image" in request.files:
             file = request.files["image"]
-            if file and file.filename and allowed_file(file.filename):
-                ext = file.filename.rsplit(".", 1)[1].lower()
-                fname = f"{uuid.uuid4().hex}.{ext}"
-                file.save(os.path.join(UPLOAD_FOLDER, fname))
-                image_url = uploaded_image_url(fname)
+            if file and file.filename:
+                try:
+                    image_url = store_uploaded_image(file)
+                except ImageStorageError as exc:
+                    conn.close()
+                    return jsonify({"error": str(exc)}), exc.status_code
     else:
         data = request.get_json() or {}
         title = (data.get("title") or "").strip()
@@ -518,13 +568,11 @@ def manage_single_product(product_id):
 
     image = request.files.get("image") if is_multipart else None
     if image and image.filename:
-        if not allowed_file(image.filename):
+        try:
+            image_url = store_uploaded_image(image)
+        except ImageStorageError as exc:
             conn.close()
-            return jsonify({"error": "Unsupported image format. Use PNG, JPG, JPEG, WEBP, or GIF."}), 400
-        ext = image.filename.rsplit(".", 1)[1].lower()
-        filename = f"{uuid.uuid4().hex}.{ext}"
-        image.save(os.path.join(UPLOAD_FOLDER, filename))
-        image_url = uploaded_image_url(filename)
+            return jsonify({"error": str(exc)}), exc.status_code
 
     cur.execute("""
         UPDATE products
@@ -679,13 +727,11 @@ def admin_products():
 
     image = request.files.get("image") if is_multipart else None
     if image and image.filename:
-        if not allowed_file(image.filename):
+        try:
+            image_url = store_uploaded_image(image)
+        except ImageStorageError as exc:
             conn.close()
-            return jsonify({"error": "Unsupported image format. Use PNG, JPG, JPEG, WEBP, or GIF."}), 400
-        ext = image.filename.rsplit(".", 1)[1].lower()
-        filename = f"{uuid.uuid4().hex}.{ext}"
-        image.save(os.path.join(UPLOAD_FOLDER, filename))
-        image_url = uploaded_image_url(filename)
+            return jsonify({"error": str(exc)}), exc.status_code
 
     if not image_url:
         image_url = "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=600&q=80"
