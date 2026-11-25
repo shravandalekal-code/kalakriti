@@ -49,6 +49,13 @@ if not USE_POSTGRES:
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "gif"}
+IMAGE_CONTENT_TYPES = {
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "webp": "image/webp",
+    "gif": "image/gif",
+}
 ACTIVE_TOKENS = {}  # token -> {"user_id": int, "role": str}
 
 
@@ -66,7 +73,7 @@ def uploaded_image_url(filename):
     return f"{BACKEND_PUBLIC_URL}/uploads/{filename}"
 
 
-def store_uploaded_image(image_file: FileStorage) -> str:
+def store_uploaded_image(image_file: FileStorage, cursor=None) -> str:
     filename = image_file.filename or ""
     if not allowed_file(filename):
         raise ImageStorageError(
@@ -93,9 +100,21 @@ def store_uploaded_image(image_file: FileStorage) -> str:
             raise ImageStorageError("Cloudinary did not return a secure image URL.")
         return secure_url
 
+    if USE_POSTGRES:
+        if cursor is None:
+            raise ImageStorageError("Persistent image storage is unavailable.")
+        image_id = uuid.uuid4().hex
+        image_data = image_file.read()
+        content_type = IMAGE_CONTENT_TYPES[filename.rsplit(".", 1)[1].lower()]
+        cursor.execute(
+            "INSERT INTO product_images (id, content_type, image_data) VALUES (?, ?, ?)",
+            (image_id, content_type, image_data),
+        )
+        return f"{BACKEND_PUBLIC_URL}/api/product-images/{image_id}"
+
     if os.environ.get("RENDER", "").lower() == "true":
         raise ImageStorageError(
-            "Image uploads are not configured. Add CLOUDINARY_URL to the Render backend environment."
+            "Persistent image uploads require PostgreSQL or Cloudinary."
         )
 
     stored_filename = f"{uuid.uuid4().hex}.{filename.rsplit('.', 1)[1].lower()}"
@@ -161,6 +180,7 @@ def init_db():
     cur = conn.cursor()
     id_column = "id SERIAL PRIMARY KEY" if USE_POSTGRES else "id INTEGER PRIMARY KEY AUTOINCREMENT"
     real_type = "DOUBLE PRECISION" if USE_POSTGRES else "REAL"
+    image_data_type = "BYTEA" if USE_POSTGRES else "BLOB"
 
     # Users table: roles -> 'admin', 'artisan', 'customer'
     cur.execute(f"""
@@ -193,6 +213,14 @@ def init_db():
             image_url TEXT DEFAULT '',
             created_at TEXT NOT NULL,
             FOREIGN KEY (artisan_id) REFERENCES users(id)
+        )
+    """)
+
+    cur.execute(f"""
+        CREATE TABLE IF NOT EXISTS product_images (
+            id TEXT PRIMARY KEY,
+            content_type TEXT NOT NULL,
+            image_data {image_data_type} NOT NULL
         )
     """)
 
@@ -266,6 +294,25 @@ def auth_required(roles=None):
 @app.route("/uploads/<path:filename>")
 def serve_upload(filename):
     return send_from_directory(UPLOAD_FOLDER, filename)
+
+
+@app.route("/api/product-images/<image_id>")
+def serve_product_image(image_id):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT content_type, image_data FROM product_images WHERE id = ?",
+        (image_id,),
+    )
+    image = cur.fetchone()
+    conn.close()
+    if not image:
+        return jsonify({"error": "Image not found"}), 404
+    return Response(
+        bytes(image["image_data"]),
+        mimetype=image["content_type"],
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+    )
 
 
 # -------------------- AUTHENTICATION FLOW (Admin, Artisan, Customer) --------------------
@@ -483,7 +530,7 @@ def artisan_products():
             file = request.files["image"]
             if file and file.filename:
                 try:
-                    image_url = store_uploaded_image(file)
+                    image_url = store_uploaded_image(file, cur)
                 except ImageStorageError as exc:
                     conn.close()
                     return jsonify({"error": str(exc)}), exc.status_code
@@ -569,7 +616,7 @@ def manage_single_product(product_id):
     image = request.files.get("image") if is_multipart else None
     if image and image.filename:
         try:
-            image_url = store_uploaded_image(image)
+            image_url = store_uploaded_image(image, cur)
         except ImageStorageError as exc:
             conn.close()
             return jsonify({"error": str(exc)}), exc.status_code
@@ -728,7 +775,7 @@ def admin_products():
     image = request.files.get("image") if is_multipart else None
     if image and image.filename:
         try:
-            image_url = store_uploaded_image(image)
+            image_url = store_uploaded_image(image, cur)
         except ImageStorageError as exc:
             conn.close()
             return jsonify({"error": str(exc)}), exc.status_code

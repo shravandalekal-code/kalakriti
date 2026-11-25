@@ -9,6 +9,7 @@ from werkzeug.datastructures import FileStorage
 from app import (
     ImageStorageError,
     PostgresCursor,
+    app as flask_app,
     insert_and_get_id,
     require_persistent_hosted_database,
     row_value,
@@ -17,9 +18,10 @@ from app import (
 
 
 class FakeCursor:
-    def __init__(self):
+    def __init__(self, row=None):
         self.query = None
         self.params = None
+        self.row = row
 
     def execute(self, query, params):
         self.query = query
@@ -27,7 +29,18 @@ class FakeCursor:
         return self
 
     def fetchone(self):
-        return {"id": 42}
+        return self.row or {"id": 42}
+
+
+class FakeConnection:
+    def __init__(self, cursor):
+        self.test_cursor = cursor
+
+    def cursor(self):
+        return self.test_cursor
+
+    def close(self):
+        pass
 
 
 class DatabaseAdapterTests(unittest.TestCase):
@@ -84,17 +97,39 @@ class DatabaseAdapterTests(unittest.TestCase):
             unique_filename=True,
         )
 
-    def test_render_upload_requires_cloudinary_configuration(self):
+    def test_postgres_upload_uses_database_without_cloudinary_configuration(self):
         image = FileStorage(stream=io.BytesIO(b"image-bytes"), filename="craft.jpg")
+        cursor = FakeCursor()
 
-        with tempfile.TemporaryDirectory() as upload_folder, patch(
+        with patch("app.USE_POSTGRES", True), patch(
             "app.CLOUDINARY_URL", ""
-        ), patch("app.UPLOAD_FOLDER", upload_folder), patch.dict(
+        ), patch("app.BACKEND_PUBLIC_URL", "https://api.example"), patch.dict(
             os.environ, {"RENDER": "true"}
         ):
-            with self.assertRaisesRegex(ImageStorageError, "CLOUDINARY_URL"):
-                store_uploaded_image(image)
-            self.assertEqual(os.listdir(upload_folder), [])
+            image_url = store_uploaded_image(image, cursor)
+
+        self.assertRegex(image_url, r"^https://api\.example/api/product-images/[0-9a-f]{32}$")
+        self.assertEqual(
+            cursor.query,
+            "INSERT INTO product_images (id, content_type, image_data) VALUES (?, ?, ?)",
+        )
+        self.assertEqual(cursor.params[1:], ("image/jpeg", b"image-bytes"))
+
+    def test_database_image_endpoint_returns_persisted_image_bytes(self):
+        cursor = FakeCursor(
+            {"content_type": "image/jpeg", "image_data": b"image-bytes"}
+        )
+
+        with patch("app.get_db", return_value=FakeConnection(cursor)):
+            response = flask_app.test_client().get("/api/product-images/image-id")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, "image/jpeg")
+        self.assertEqual(response.data, b"image-bytes")
+        self.assertEqual(
+            response.headers["Cache-Control"],
+            "public, max-age=31536000, immutable",
+        )
 
     def test_local_upload_falls_back_to_local_storage(self):
         image = FileStorage(stream=io.BytesIO(b"image-bytes"), filename="craft.JPG")
