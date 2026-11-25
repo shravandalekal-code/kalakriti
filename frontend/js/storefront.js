@@ -258,20 +258,54 @@ async function viewProductDetails(productId) {
   const res = await fetch(`${API_BASE}/products/${productId}`);
   const p = await res.json();
   if (!res.ok) return;
+  const craftIcons = {
+    Woodwork: "🪵",
+    Pottery: "🏺",
+    Textiles: "🧵",
+    Metalwork: "🔔",
+    "Bamboo & Cane": "🎋"
+  };
+  const fallbackIcon = craftIcons[p.category] || "✨";
 
   document.getElementById("product-detail-body").innerHTML = `
-    <div class="artisan-grid">
-      <img src="${p.image_url}" alt="${p.title}" style="width:100%; border-radius:8px; max-height:300px; object-fit:cover;" />
-      <div>
-        <span class="product-cat">${p.category}</span>
-        <h2>${p.title}</h2>
-        <p class="price-tag" style="margin:8px 0;">₹${p.price}</p>
-        <p>${p.description}</p>
-        <hr style="margin:12px 0; border:none; border-top:1px solid #e7e5e4;" />
-        <p><strong>Artisan:</strong> ${p.artisan_name} (${p.craft_specialty || "Handcraft"})</p>
-        <p><strong>Origin:</strong> ${p.artisan_location || "Local Workshop"}</p>
-        <p><strong>In Stock:</strong> ${p.stock} units</p>
-        <button class="btn-primary full-width mt-10" onclick="addToCart(${p.id}); closeProductModal();">Add to Cart</button>
+    <div class="product-detail-layout">
+      <div class="detail-visual">
+        <div class="detail-image-frame">
+          <img src="${p.image_url}" alt="${p.title}" class="detail-image" onerror="this.hidden = true; this.parentElement.classList.add('image-unavailable'); this.nextElementSibling.classList.remove('hidden')" />
+          <div class="detail-image-fallback hidden" role="img" aria-label="Product photo unavailable">
+            <span class="detail-fallback-icon" aria-hidden="true">${fallbackIcon}</span>
+            <strong>Handmade with care</strong>
+            <small>Product photo coming soon</small>
+          </div>
+          <span class="detail-image-caption">Handcrafted by ${p.artisan_name}</span>
+        </div>
+      </div>
+      <div class="detail-copy">
+        <span class="detail-category">${p.category}</span>
+        <h2 class="detail-title">${p.title}</h2>
+        <div class="detail-price-row">
+          <span class="detail-price-note">A little piece of handmade heritage</span>
+          <span class="price-tag detail-price">₹${p.price}</span>
+        </div>
+        <div class="detail-story">
+          <span class="detail-story-label">THE STORY</span>
+          <p class="detail-description">${p.description}</p>
+        </div>
+        <div class="detail-meta-grid">
+          <div class="detail-meta-item">
+            <span>Artisan</span>
+            <strong>${p.artisan_name} · ${p.craft_specialty || "Handcraft"}</strong>
+          </div>
+          <div class="detail-meta-item">
+            <span>Made in</span>
+            <strong>${p.artisan_location || "Local Workshop"}</strong>
+          </div>
+          <div class="detail-meta-item">
+            <span>Availability</span>
+            <strong>${p.stock} in stock</strong>
+          </div>
+        </div>
+        <button class="btn-primary detail-add-button full-width" onclick="addToCart(${p.id}); closeProductModal();">Add to Cart</button>
       </div>
     </div>
   `;
