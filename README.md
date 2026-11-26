@@ -37,7 +37,7 @@ python app.py
 Keep this password out of source control. Without `DATABASE_URL`, the first run initializes the admin account (`admin@kalakriti.in`) and the SQLite database (`artisan_marketplace.db`) on `http://127.0.0.1:5000`. Register a new public account to sign in as a customer or artisan.
 
 ### 2. Start the Frontend
-Open `frontend/index.html` (Public Portal) or `frontend/admin.html` (Admin Portal) in your browser, or serve the `frontend/` folder with VS Code Live Server / `python -m http.server 8000`. The public portal also has an **Admin Portal** link in its navigation.
+Open `frontend/index.html` (Public Portal) or `frontend/admin.html` (Admin Portal) directly in your browser, or serve the `frontend/` folder with VS Code Live Server / `python -m http.server 8000`.
 
 ## Deploy on Render
 
