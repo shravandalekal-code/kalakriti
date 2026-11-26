@@ -577,7 +577,14 @@ def manage_single_product(product_id):
         return jsonify({"error": "You can only edit your own products."}), 403
 
     if request.method == "DELETE":
-        cur.execute("DELETE FROM products WHERE id = ?", (product_id,))
+        try:
+            cur.execute("DELETE FROM products WHERE id = ?", (product_id,))
+        except (sqlite3.IntegrityError, psycopg.IntegrityError):
+            conn.rollback()
+            conn.close()
+            return jsonify({
+                "error": "This product is part of an order and cannot be deleted. Mark it unavailable to remove it from the storefront."
+            }), 409
         conn.commit()
         conn.close()
         return jsonify({"message": "Product deleted"})
@@ -862,6 +869,29 @@ def admin_update_order_status(order_id):
     conn.commit()
     conn.close()
     return jsonify({"message": f"Order #{order_id} status updated to {status}"})
+
+
+@app.route("/api/admin/orders/<int:order_id>", methods=["DELETE"])
+@auth_required(roles=["admin"])
+def admin_delete_order(order_id):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM orders WHERE id = ?", (order_id,))
+    if not cur.fetchone():
+        conn.close()
+        return jsonify({"error": "Order not found."}), 404
+
+    try:
+        cur.execute("DELETE FROM order_items WHERE order_id = ?", (order_id,))
+        cur.execute("DELETE FROM orders WHERE id = ?", (order_id,))
+        conn.commit()
+    except (sqlite3.IntegrityError, psycopg.IntegrityError):
+        conn.rollback()
+        conn.close()
+        return jsonify({"error": "This order has related records and cannot be deleted."}), 409
+
+    conn.close()
+    return jsonify({"message": f"Order #{order_id} and its history were deleted."})
 
 
 @app.route("/api/admin/reports", methods=["GET"])

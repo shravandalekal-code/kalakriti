@@ -1,5 +1,6 @@
 import io
 import os
+import sqlite3
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -39,8 +40,48 @@ class FakeConnection:
     def cursor(self):
         return self.test_cursor
 
+    def rollback(self):
+        self.rolled_back = True
+
     def close(self):
-        pass
+        self.closed = True
+
+
+class DeleteProductCursor:
+    def execute(self, query, params):
+        if query.startswith("DELETE"):
+            raise sqlite3.IntegrityError("product referenced by an order")
+
+    def fetchone(self):
+        return {"id": 7, "artisan_id": 3}
+
+
+class DeleteProductConnection(FakeConnection):
+    def __init__(self):
+        super().__init__(DeleteProductCursor())
+        self.rolled_back = False
+        self.closed = False
+
+
+class DeleteOrderCursor:
+    def __init__(self):
+        self.queries = []
+
+    def execute(self, query, params):
+        self.queries.append((query, params))
+
+    def fetchone(self):
+        return {"id": 3}
+
+
+class DeleteOrderConnection(FakeConnection):
+    def __init__(self):
+        super().__init__(DeleteOrderCursor())
+        self.committed = False
+        self.closed = False
+
+    def commit(self):
+        self.committed = True
 
 
 class DatabaseAdapterTests(unittest.TestCase):
@@ -130,6 +171,37 @@ class DatabaseAdapterTests(unittest.TestCase):
             response.headers["Cache-Control"],
             "public, max-age=31536000, immutable",
         )
+
+    def test_deleting_ordered_product_returns_conflict_and_preserves_data(self):
+        connection = DeleteProductConnection()
+        with patch("app.get_db", return_value=connection), patch.dict(
+            "app.ACTIVE_TOKENS", {"admin-token": {"user_id": 1, "role": "admin"}}
+        ):
+            response = flask_app.test_client().delete(
+                "/api/artisan/products/7",
+                headers={"Authorization": "Bearer admin-token"},
+            )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("part of an order", response.get_json()["error"])
+        self.assertTrue(connection.rolled_back)
+        self.assertTrue(connection.closed)
+
+    def test_admin_can_delete_order_and_its_line_items(self):
+        connection = DeleteOrderConnection()
+        with patch("app.get_db", return_value=connection), patch.dict(
+            "app.ACTIVE_TOKENS", {"admin-token": {"user_id": 1, "role": "admin"}}
+        ):
+            response = flask_app.test_client().delete(
+                "/api/admin/orders/3",
+                headers={"Authorization": "Bearer admin-token"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("order_items", connection.test_cursor.queries[1][0])
+        self.assertIn("DELETE FROM orders", connection.test_cursor.queries[2][0])
+        self.assertTrue(connection.committed)
+        self.assertTrue(connection.closed)
 
     def test_local_upload_falls_back_to_local_storage(self):
         image = FileStorage(stream=io.BytesIO(b"image-bytes"), filename="craft.JPG")

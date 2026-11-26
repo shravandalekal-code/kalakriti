@@ -293,15 +293,35 @@ async function adminUpdateProduct(id) {
 
 async function adminDeleteProduct(id) {
   if (!confirm("Permanently delete this product?")) return;
-  const res = await fetch(`${API_BASE}/artisan/products/${id}`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${adminToken}` }
-  });
-  if (res.ok) {
-    showToast("Product deleted");
-    loadProducts();
-    loadReports();
+  let res;
+  try {
+    res = await fetch(`${API_BASE}/artisan/products/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${adminToken}` }
+    });
+  } catch {
+    showToast("Could not reach the server. Check your connection and try again.");
+    return;
   }
+
+  if (res.status === 401) {
+    adminLogout();
+    return;
+  }
+
+  let data = {};
+  try {
+    data = await res.json();
+  } catch {
+    // Use the HTTP status below when the server does not return JSON.
+  }
+  if (!res.ok) {
+    showToast(data.error || `Failed to delete product (HTTP ${res.status})`);
+    return;
+  }
+
+  showToast(data.message || "Product deleted");
+  await Promise.all([loadProducts(), loadReports()]);
 }
 
 // 4. View & Update Orders
@@ -325,9 +345,44 @@ async function loadOrders() {
             `<option value="${st}" ${o.status === st ? "selected" : ""}>${st}</option>`
           ).join("")}
         </select>
+        <button class="btn-danger btn-sm" onclick="adminDeleteOrder(${o.id})">Delete Order</button>
       </td>
     </tr>
   `).join("");
+}
+
+async function adminDeleteOrder(orderId) {
+  if (!confirm(`Permanently delete order #${orderId} and its order history?`)) return;
+
+  let res;
+  try {
+    res = await fetch(`${API_BASE}/admin/orders/${orderId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${adminToken}` }
+    });
+  } catch {
+    showToast("Could not reach the server. Check your connection and try again.");
+    return;
+  }
+
+  if (res.status === 401) {
+    adminLogout();
+    return;
+  }
+
+  let data = {};
+  try {
+    data = await res.json();
+  } catch {
+    // Use the HTTP status below when the server does not return JSON.
+  }
+  if (!res.ok) {
+    showToast(data.error || `Failed to delete order (HTTP ${res.status})`);
+    return;
+  }
+
+  showToast(data.message || `Order #${orderId} deleted`);
+  await Promise.all([loadOrders(), loadReports()]);
 }
 
 async function updateOrderStatus(orderId, status) {
